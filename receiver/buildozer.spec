@@ -3,7 +3,7 @@ title = BLE Receiver
 package.name = blereceiver
 package.domain = org.bleremote
 source.dir = .
-source.include_exts = py,ttf,json
+source.include_exts = py,kv,png,jpg,jpeg,ttf,otf,json,txt
 version = 0.1
 requirements = python3,kivy==2.3.0,pyjnius,android,arabic-reshaper,python-bidi
 orientation = portrait
