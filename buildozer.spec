@@ -5,7 +5,7 @@ package.domain = org.bleremote
 source.dir = .
 source.include_exts = py,ttf,otf,json
 version = 0.1
-requirements = python3,kivy==2.3.0,pyjnius,android,arabic-reshaper,python-bidi
+requirements = python3,kivy==2.3.0,pyjnius,android,six,arabic-reshaper==3.0.0,python-bidi==0.4.2
 orientation = portrait
 fullscreen = 1
 android.permissions = BLUETOOTH,BLUETOOTH_ADMIN,BLUETOOTH_SCAN,BLUETOOTH_CONNECT,ACCESS_FINE_LOCATION
