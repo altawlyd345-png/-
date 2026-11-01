@@ -34,7 +34,23 @@ jobs:
 
       - name: Build APK
         working-directory: ${{ matrix.app }}
-        run: yes | buildozer -v android debug
+        run: |
+          set -o pipefail
+          yes | buildozer -v android debug 2>&1 | tee ../build-${{ matrix.app }}.log
+
+      - name: Show error (last lines)
+        if: failure()
+        run: |
+          grep -n -i -E "error|failed|exception|not found" build-${{ matrix.app }}.log | tail -n 25
+          echo ------ TAIL ------
+          tail -n 40 build-${{ matrix.app }}.log
+
+      - name: Upload log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-${{ matrix.app }}
+          path: build-${{ matrix.app }}.log
 
       - uses: actions/upload-artifact@v4
         with:
