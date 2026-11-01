@@ -18,11 +18,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Prepare font directory
-        run: |
-          mkdir -p ${{ matrix.app }}/fonts
-          curl -fL -o ${{ matrix.app }}/fonts/NotoNaskhArabic-Regular.ttf \
-            https://github.com/notofonts/notofonts.github.io/raw/main/fonts/NotoNaskhArabic/hinted/ttf/NotoNaskhArabic-Regular.ttf || true
+      - name: Prepare fonts directory
+        run: mkdir -p ${{ matrix.app }}/fonts
 
       - name: Build APK
         uses: ArtemSBulgakov/buildozer-action@v1
