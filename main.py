@@ -366,4 +366,124 @@ class SenderApp(App):
         home = Screen(name="home"); hb = BoxLayout(orientation="vertical", padding=dp(8), spacing=dp(6))
         hb.add_widget(L("BLE Remote — Sender", 40, bold=True, font_size="22sp")); hb.add_widget(self.status)
         g = GridLayout(cols=2, spacing=dp(6)); hb.add_widget(g); home.add_widget(hb); self.sm.add_widget(home)
-        memo_f = [("name", 
+        memo_f = [("name", "الاسم", False), ("folder", "المجلد/التصنيف", False), ("body", "النص", True)]
+        pages = [
+            ("designer", "Screen Designer", Designer(self)), ("text", "Text Studio", TextStudio(self)),
+            ("fonts", "Font Library", Fonts(self)),
+            ("memos", "Memo Manager", ListPage(self, "memos", "Memo Manager", "memos", memo_f, send=self.send_memo)),
+            ("media", "Media Studio", Soon(self, "media", "Media Studio", "الصور والفيديو والصوت: المرحلة القادمة (تحتاج نقل Wi-Fi)")),
+            ("remote", "Remote Control", Remote(self)),
+            ("touch", "Remote Touch", Soon(self, "touch", "Remote Touch", "يتطلب Accessibility Service على Receiver — مرحلة لاحقة")),
+            ("live", "Live Screen", Soon(self, "live", "Live Screen", "يتطلب MediaProjection + Wi-Fi — مرحلة لاحقة")),
+            ("voice", "Voice Control", Soon(self, "voice", "Voice Control", "الأوامر الصوتية: مرحلة لاحقة")),
+            ("templates", "Templates", ListPage(self, "templates", "Templates", "templates",
+                [("name", "الاسم", False), ("body", "التصميم (JSON)", True)], extra=("فتح", self.open_design))),
+            ("playlists", "Playlists", ListPage(self, "playlists", "Playlists", "playlists",
+                [("name", "الاسم", False), ("items", "أسماء المذكرات (سطر لكل عنصر)", True), ("secs", "ثواني لكل عنصر", False)],
+                send=self.send_playlist)),
+            ("sched", "Scheduler", ListPage(self, "sched", "Scheduler", "schedules",
+                [("name", "الاسم", False), ("memo", "اسم المذكرة", False), ("when", "الموعد YYYY-MM-DD HH:MM", False)])),
+            ("devices", "Device Manager", Devices(self)),
+            ("projects", "Projects", ListPage(self, "projects", "Projects", "projects",
+                [("name", "الاسم", False), ("body", "ملاحظات", True)])),
+            ("backup", "Backup & Restore", Backup(self)), ("settings", "Settings", Settings(self)),
+            ("pages", "Pages", ListPage(self, "pages", "Pages (تصاميم)", "pages",
+                [("name", "الاسم", False), ("body", "التصميم (JSON)", True)], extra=("فتح", self.open_design),
+                send=self.send_page)),
+        ]
+        for key, title, scr in pages:
+            self.sm.add_widget(scr)
+            g.add_widget(B(title, lambda k=key: self.go(k), BLUE, 56))
+        self.designer = self.sm.get_screen("designer")
+        return self.sm
+
+    # navigation / helpers
+    def go(self, k): self.sm.current = k
+    def toast(self, m): self.msg = m; self.status.text = T(m)
+    def scan_fonts(self):
+        self.fonts = {}
+        for d in ("fonts", self.fdir):
+            for f in glob.glob(os.path.join(d, "*.[to]tf")):
+                self.fonts[os.path.splitext(os.path.basename(f))[0]] = f
+    def status_text(self): return STATES.get(str(self.ble.getState()), "") if self.ble else "غير جاهز"
+    def chunk(self): return int(self.ble.chunkSize()) if self.ble else 0
+
+    def on_start(self):
+        pin = self.store.d["settings"].get("pin")
+        if pin: self.ask_pin(pin)
+        try:
+            from android.permissions import request_permissions
+            request_permissions(PERMS, lambda p, g: Clock.schedule_once(self.init_ble, 0))
+        except Exception: self.init_ble()
+        Clock.schedule_interval(self.check_schedule, 15)
+
+    def ask_pin(self, h):
+        box = BoxLayout(orientation="vertical", padding=dp(8), spacing=dp(8))
+        ti = TI(hint="PIN", password=True); box.add_widget(L("أدخل PIN")); box.add_widget(ti)
+        p = Popup(title="PIN", content=box, size_hint=(.9, .4), auto_dismiss=False)
+        def ok():
+            if hashlib.sha256(ti.text.encode()).hexdigest() == h: p.dismiss()
+            else: ti.text = ""
+        box.add_widget(B("دخول", ok, GREEN)); p.open()
+
+    def init_ble(self, *a):
+        try:
+            from jnius import autoclass
+            act = autoclass("org.kivy.android.PythonActivity").mActivity
+            self.ble = autoclass("org.bleremote.BleClient")(act)
+            Clock.schedule_interval(self.tick, 0.1)
+        except Exception as e: self.status.text = "BLE: %s" % e
+
+    def connect(self):
+        if self.ble: self.ble.connect()
+    def disconnect(self):
+        if self.ble: self.ble.close()
+
+    def tick(self, dt):
+        if not self.pending: self.status.text = T(self.msg or self.status_text())
+        for _ in range(20):
+            raw = self.ble.poll()
+            if raw is None: break
+            m = self.ra.feed(to_bytes(raw))
+            if m and m.get("t") == "ack":
+                mid = m["d"].get("id"); what = self.pending.pop(mid, None)
+                if what:
+                    ok = m["d"].get("ok"); self.store.log(("✔ " if ok else "✘ ") + what)
+                    self.msg = "تم الاستلام والاعتماد ✔" if ok else "رفض Receiver الأمر"; self.status.text = T(self.msg)
+
+    # sending (always explicit)
+    def send(self, type_, data):
+        if not self.ble or str(self.ble.getState()) != "ready":
+            self.toast("غير متصل بـ Receiver"); return False
+        env = encode(type_, data); mid = json.loads(env[8:].decode("utf-8"))["id"]
+        self.pending[mid] = type_
+        for p in fragment(env, int(self.ble.chunkSize())): self.ble.send(p)
+        self.store.log("→ " + type_); self.status.text = T("جاري الإرسال..."); return True
+
+    def style_of(self, memo):
+        s = self.sm.get_screen("text").style(); s["text"] = memo.get("body", ""); return s
+    def send_memo(self, it):
+        confirm("إرسال «%s» واعتماده؟" % it.get("name", ""), lambda: self.send("apply_text", self.style_of(it)))
+    def send_page(self, it):
+        confirm("إرسال «%s» واعتماده؟" % it.get("name", ""),
+                lambda: self.send("apply_design", json.loads(it.get("body") or "{}")))
+    def send_playlist(self, it):
+        names = [n.strip() for n in it.get("items", "").splitlines() if n.strip()]
+        memos = {m["name"]: m for m in self.store.d["memos"]}
+        items = [self.style_of(memos[n]) for n in names if n in memos]
+        confirm("إرسال قائمة التشغيل كاملة؟", lambda: self.send("apply_playlist",
+                {"items": items, "secs": int(it.get("secs") or 10), "loop": True}))
+    def open_design(self, it):
+        try: d = json.loads(it.get("body") or "{}")
+        except Exception: self.toast("تصميم غير صالح"); return
+        self.go("designer"); Clock.schedule_once(lambda *_: self.designer.load(d), 0.2)
+
+    def check_schedule(self, dt):
+        now = time.strftime("%Y-%m-%d %H:%M")
+        for s in self.store.d["schedules"]:
+            if s.get("when", "").strip() == now and s["id"] + now not in self.fired:
+                self.fired.add(s["id"] + now)
+                m = next((x for x in self.store.d["memos"] if x["name"] == s.get("memo")), None)
+                if m: self.send("apply_text", self.style_of(m)); self.store.log("جدولة: " + s["name"])
+
+SenderApp().run()
