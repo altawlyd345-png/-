@@ -12,14 +12,16 @@ jobs:
 
     strategy:
       matrix:
-        app: [sender, receiver]
+        app:
+          - sender
+          - receiver
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Prepare fonts directory
-        run: mkdir -p ${{ matrix.app }}/fonts
+        run: mkdir -p "${{ matrix.app }}/fonts"
 
       - name: Build APK
         uses: ArtemSBulgakov/buildozer-action@v1
