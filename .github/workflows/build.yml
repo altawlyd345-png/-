@@ -34,14 +34,12 @@ jobs:
 
       - name: Build APK
         working-directory: ${{ matrix.app }}
-        run: |
-          set -o pipefail
-          yes | buildozer -v android debug 2>&1 | tee ../build-${{ matrix.app }}.log
+        run: buildozer -v android debug > ../build-${{ matrix.app }}.log 2>&1
 
       - name: Show error (last lines)
         if: failure()
         run: |
-          MSG=$(grep -n -i -E "error|failed|exception|not found" build-${{ matrix.app }}.log | tail -n 8 | cut -c1-220 | sed ':a;N;$!ba;s/\n/%0A/g')
+          MSG=$(grep -n -i -E "error:|failed|exception" build-${{ matrix.app }}.log | tail -n 8 | cut -c1-220 | sed ':a;N;$!ba;s/\n/%0A/g')
           echo "::error title=BuildError ${{ matrix.app }}::$MSG"
           MSG2=$(tail -n 12 build-${{ matrix.app }}.log | cut -c1-220 | sed ':a;N;$!ba;s/\n/%0A/g')
           echo "::error title=BuildTail ${{ matrix.app }}::$MSG2"
@@ -53,7 +51,8 @@ jobs:
           name: log-${{ matrix.app }}
           path: build-${{ matrix.app }}.log
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.app }}-apk
           path: ${{ matrix.app }}/bin/*.apk
