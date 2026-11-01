@@ -1,58 +1,28 @@
-name: Build APKs
-on: [push, workflow_dispatch]
-jobs:
-  build:
-    runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [sender, receiver]
-    steps:
-      - uses: actions/checkout@v4
+[app]
+title = Bluetooth Sender
+package.name = bluetoothsender
+package.domain = org.bleremote
+source.dir = .
+source.include_exts = py,kv,png,jpg,jpeg,ttf,otf,json,txt
+version = 0.1
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
+requirements = python3,kivy==2.3.0,pyjnius,android,six,arabic-reshaper==3.0.0,python-bidi==0.4.2
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
+orientation = portrait
+fullscreen = 1
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git zip unzip autoconf automake libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev libltdl-dev build-essential ccache
-          pip install --upgrade pip
-          pip install buildozer==1.5.0 cython==0.29.36 virtualenv
+android.permissions = BLUETOOTH,BLUETOOTH_ADMIN,BLUETOOTH_SCAN,BLUETOOTH_CONNECT,ACCESS_FINE_LOCATION
 
-      - name: Download Arabic font
-        run: |
-          mkdir -p ${{ matrix.app }}/fonts
-          F=${{ matrix.app }}/fonts/NotoNaskhArabic-Regular.ttf
-          curl -fL -o $F https://github.com/notofonts/notofonts.github.io/raw/main/fonts/NotoNaskhArabic/hinted/ttf/NotoNaskhArabic-Regular.ttf || rm -f $F
+android.api = 33
+android.minapi = 21
+android.ndk = 25b
+android.ndk_api = 21
+android.archs = arm64-v8a
+android.add_src = java
+android.accept_sdk_license = True
 
-      - name: Build APK
-        working-directory: ${{ matrix.app }}
-        run: buildozer -v android debug > ../build-${{ matrix.app }}.log 2>&1
+p4a.branch = v2024.01.21
 
-      - name: Show error (last lines)
-        if: failure()
-        run: |
-          MSG=$(grep -n -i -E "error:|failed|exception" build-${{ matrix.app }}.log | tail -n 8 | cut -c1-220 | sed ':a;N;$!ba;s/\n/%0A/g')
-          echo "::error title=BuildError ${{ matrix.app }}::$MSG"
-          MSG2=$(tail -n 12 build-${{ matrix.app }}.log | cut -c1-220 | sed ':a;N;$!ba;s/\n/%0A/g')
-          echo "::error title=BuildTail ${{ matrix.app }}::$MSG2"
-
-      - name: Upload log
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: log-${{ matrix.app }}
-          path: build-${{ matrix.app }}.log
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.app }}-apk
-          path: ${{ matrix.app }}/bin/*.apk
+[buildozer]
+log_level = 2
+warn_on_root = 1
