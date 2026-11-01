@@ -41,9 +41,10 @@ jobs:
       - name: Show error (last lines)
         if: failure()
         run: |
-          grep -n -i -E "error|failed|exception|not found" build-${{ matrix.app }}.log | tail -n 25
-          echo ------ TAIL ------
-          tail -n 40 build-${{ matrix.app }}.log
+          MSG=$(grep -n -i -E "error|failed|exception|not found" build-${{ matrix.app }}.log | tail -n 8 | cut -c1-220 | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=BuildError ${{ matrix.app }}::$MSG"
+          MSG2=$(tail -n 12 build-${{ matrix.app }}.log | cut -c1-220 | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=BuildTail ${{ matrix.app }}::$MSG2"
 
       - name: Upload log
         if: failure()
