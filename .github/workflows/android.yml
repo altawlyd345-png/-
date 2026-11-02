@@ -8,8 +8,7 @@ workflow_dispatch:
 
 jobs:
 build:
-name: Build ${{ matrix.app }}
-runs-on: ubuntu-latest
+runs-on: ubuntu-22.04
 
 strategy:
   fail-fast: false
@@ -18,20 +17,51 @@ strategy:
       - sender
       - receiver
 
+name: Build ${{ matrix.app }}
+
 steps:
-  - name: Checkout repository
+  - name: Checkout
     uses: actions/checkout@v4
 
-  - name: Build APK
-    uses: ArtemSBulgakov/buildozer-action@v1
-    id: buildozer
+  - name: Setup Java
+    uses: actions/setup-java@v4
     with:
-      workdir: ${{ matrix.app }}
-      buildozer_version: stable
+      distribution: temurin
+      java-version: '17'
+
+  - name: Setup Python
+    uses: actions/setup-python@v5
+    with:
+      python-version: '3.10'
+
+  - name: Install dependencies
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y \
+        git zip unzip autoconf libtool \
+        pkg-config zlib1g-dev libncurses5-dev \
+        libncursesw5-dev cmake libffi-dev libssl-dev
+      pip install --upgrade pip
+      pip install buildozer cython==0.29.36
+
+  - name: Build APK
+    working-directory: ${{ matrix.app }}
+    run: |
+      set -o pipefail
+      buildozer -v android debug 2>&1 | tee build.log
+
+  - name: Upload build log
+    if: always()
+    uses: actions/upload-artifact@v4
+    with:
+      name: build-log-${{ matrix.app }}
+      path: ${{ matrix.app }}/build.log
+      if-no-files-found: warn
 
   - name: Upload APK
+    if: success()
     uses: actions/upload-artifact@v4
     with:
       name: BLE-Remote-${{ matrix.app }}
-      path: ${{ steps.buildozer.outputs.filename }}
+      path: ${{ matrix.app }}/bin/*.apk
       if-no-files-found: error
