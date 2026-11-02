@@ -1,58 +1,135 @@
-import json, os, time, uuid
-
-DEFAULT = {"memos": [], "pages": [], "templates": [], "playlists": [],
-           "schedules": [], "projects": [], "log": [], "settings": {}}
+import json
+import os
+import time
+import uuid
 
 class Store:
-    def __init__(self, path):
-        self.path = path
-        self.d = json.loads(json.dumps(DEFAULT))
-        try:
-            with open(path, encoding="utf-8") as f:
-                self.d.update(json.load(f))
-        except Exception:
-            pass
 
-    def save(self):
-        tmp = self.path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(self.d, f, ensure_ascii=False)
-        os.replace(tmp, self.path)
+COLLECTIONS = [
+    "memos",
+    "pages",
+    "templates",
+    "playlists",
+    "schedules",
+    "projects"
+]
 
-    def items(self, col, q=""):
-        q = q.strip().lower()
-        out = [i for i in self.d[col] if not q or q in json.dumps(i, ensure_ascii=False).lower()]
-        return sorted(out, key=lambda i: (not i.get("fav"), i.get("name", "")))
+def __init__(self, path):
+    self.path = path
+    os.makedirs(os.path.dirname(path), exist_ok=True)
 
-    def put(self, col, item):
-        item = dict(item)
-        item.setdefault("id", uuid.uuid4().hex[:8])
-        item["ts"] = int(time.time())
-        lst = self.d[col]
-        for n, o in enumerate(lst):
-            if o["id"] == item["id"]:
-                lst[n] = item; break
-        else:
-            lst.append(item)
-        self.save(); return item
+    self.d = {
+        "settings": {"pin": ""},
+        "log": []
+    }
 
-    def delete(self, col, id_):
-        self.d[col] = [i for i in self.d[col] if i["id"] != id_]
+    for name in self.COLLECTIONS:
+        self.d[name] = []
+
+    self.load()
+
+def load(self):
+    if not os.path.exists(self.path):
         self.save()
+        return
 
-    def log(self, text):
-        self.d["log"].append({"t": time.strftime("%Y-%m-%d %H:%M:%S"), "m": text})
-        self.d["log"] = self.d["log"][-300:]
-        self.save()
-
-    def export_to(self, path):
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump({k: v for k, v in self.d.items() if k != "log"}, f, ensure_ascii=False)
-
-    def import_from(self, path):
-        with open(path, encoding="utf-8") as f:
+    try:
+        with open(self.path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        for k in DEFAULT:
-            if k in data and k != "log":
-                self.d[k] = data[k]
+
+        self.d.update(data)
+
+        for name in self.COLLECTIONS:
+            self.d.setdefault(name, [])
+
+        self.d.setdefault("settings", {"pin": ""})
+        self.d.setdefault("log", [])
+
+    except (ValueError, OSError):
         self.save()
+
+def save(self):
+    temp = self.path + ".tmp"
+
+    with open(temp, "w", encoding="utf-8") as f:
+        json.dump(self.d, f, ensure_ascii=False, indent=2)
+
+    os.replace(temp, self.path)
+
+def put(self, collection, item):
+    if collection not in self.COLLECTIONS:
+        raise ValueError("قسم غير معروف")
+
+    item = dict(item)
+    item.setdefault("id", str(uuid.uuid4()))
+    item["updated"] = time.time()
+
+    items = self.d[collection]
+
+    for index, old in enumerate(items):
+        if old["id"] == item["id"]:
+            items[index] = item
+            self.save()
+            return item
+
+    items.append(item)
+    self.save()
+    return item
+
+def items(self, collection, query=""):
+    if collection not in self.COLLECTIONS:
+        raise ValueError("قسم غير معروف")
+
+    query = query.strip().casefold()
+
+    result = self.d[collection]
+
+    if query:
+        result = [
+            item for item in result
+            if query in str(item.get("name", "")).casefold()
+            or query in str(item.get("body", "")).casefold()
+        ]
+
+    return sorted(
+        result,
+        key=lambda x: x.get("updated", 0),
+        reverse=True
+    )
+
+def delete(self, collection, item_id):
+    if collection not in self.COLLECTIONS:
+        raise ValueError("قسم غير معروف")
+
+    self.d[collection] = [
+        item for item in self.d[collection]
+        if item["id"] != item_id
+    ]
+
+    self.save()
+
+def log(self, message):
+    self.d["log"].append({
+        "t": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "m": message
+    })
+
+    self.d["log"] = self.d["log"][-500:]
+    self.save()
+
+def export_to(self, path):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(self.d, f, ensure_ascii=False, indent=2)
+
+def import_from(self, path):
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    for name in self.COLLECTIONS:
+        data.setdefault(name, [])
+
+    data.setdefault("settings", {"pin": ""})
+    data.setdefault("log", [])
+
+    self.d = data
+    self.save()
