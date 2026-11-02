@@ -5,7 +5,7 @@ import time
 MAGIC = b"BL"
 HEADER = struct.Struct("!2sIHHI")
 
-DEFAULT_CHUNK = 180
+DEFAULT_CHUNK = 6
 MESSAGE_TIMEOUT = 30
 
 def encode(command, payload):
