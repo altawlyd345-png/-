@@ -1,28 +1,32 @@
 [app]
-title = BLE Receiver
-package.name = blereceiver
-package.domain = org.bleremote
-source.dir = .
-source.include_exts = py,kv,png,jpg,jpeg,ttf,otf,json,txt
-version = 0.1
 
-requirements = python3,kivy==2.3.0,pyjnius,android,six,arabic-reshaper==3.0.0,python-bidi==0.4.2
+title = BLE Remote Receiver
+package.name = bleremotereceiver
+package.domain = org.bleremote
+
+source.dir = .
+source.include_exts = py,png,jpg,kv,json,ttf
+
+version = 1.0
+
+requirements = python3,kivy,pyjnius
 
 orientation = portrait
-fullscreen = 1
+fullscreen = 0
 
-android.permissions = BLUETOOTH,BLUETOOTH_ADMIN,BLUETOOTH_SCAN,BLUETOOTH_CONNECT,BLUETOOTH_ADVERTISE,ACCESS_FINE_LOCATION,RECEIVE_BOOT_COMPLETED
+android.permissions = BLUETOOTH,BLUETOOTH_ADMIN,ACCESS_FINE_LOCATION,BLUETOOTH_SCAN,BLUETOOTH_CONNECT,BLUETOOTH_ADVERTISE
 
-android.api = 33
-android.minapi = 21
-android.ndk = 25b
-android.ndk_api = 21
-android.archs = arm64-v8a
-android.add_src = java
+android.api = 35
+android.minapi = 23
+android.targetapi = 35
+
+android.archs = arm64-v8a, armeabi-v7a
+
 android.accept_sdk_license = True
 
-p4a.branch = v2024.01.21
+android.allow_backup = True
 
 [buildozer]
+
 log_level = 2
 warn_on_root = 1
