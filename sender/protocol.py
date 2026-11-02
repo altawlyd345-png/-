@@ -7,7 +7,7 @@ import time
 MAGIC = b"BL"
 HEADER = struct.Struct("!2sIHHI")
 
-DEFAULT_CHUNK = 180
+DEFAULT_CHUNK = 6
 MAX_PARTS = 65535
 MESSAGE_TIMEOUT = 30
 
